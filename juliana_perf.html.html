@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>JUL // PERF</title>
+<style>
+  :root{
+    --bg:#0d0a14; --surface:#13101e; --surface2:#18142a; --border:#1e1a2a;
+    --text:#f0f0f8; --dim:#8080a0; --muted:#606080;
+    --accent:#e040fb; --green:#00e5a0; --orange:#ff6b35; --yellow:#ffb347;
+    --red:#ff4757; --ok:#2ecc71;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;}
+  #app{max-width:700px;margin:0 auto;min-height:100vh;padding-bottom:84px;}
+
+  main.pg{ padding:16px 14px; }
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  .eyebrow{ font-size:11px; color:var(--accent); letter-spacing:.1em; text-transform:uppercase; margin-bottom:4px; }
+  h1.h1{ font-size:22px; font-weight:700; margin:0 0 4px; }
+  .sub{ color:var(--dim); font-size:13px; margin-bottom:18px; }
+
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:16px; margin-bottom:12px; }
+  .card2{ background:var(--surface2); border:1px solid var(--border); border-radius:10px;
+    padding:14px; margin-bottom:10px; }
+  .ct{ font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:12px; }
+
+  .stat-row{ display:flex; gap:10px; margin-bottom:12px; }
+  .stat{ flex:1; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px; }
+  .stat .label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
+  .stat .value{ font-size:21px; font-weight:700; }
+  .stat .delta{ font-size:11.5px; margin-top:3px; }
+  .delta.down{ color:var(--accent); } .delta.up{ color:var(--red); } .delta.flat{ color:var(--dim); }
+
+  .schedule-row{ display:flex; align-items:center; justify-content:space-between;
+    padding:10px 0; border-bottom:1px solid var(--border); font-size:13.5px; }
+  .schedule-row:last-child{ border-bottom:none; }
+  .schedule-row .day{ color:var(--dim); width:70px; flex-shrink:0; }
+  .schedule-row .what{ flex:1; }
+
+  .badge{ display:inline-block; font-size:10px; font-weight:700; letter-spacing:.06em;
+    text-transform:uppercase; padding:3px 8px; border-radius:4px;
+    color:var(--accent); background:rgba(224,64,251,.1); border:1px solid rgba(224,64,251,.25); }
+  .badge.cardio{ color:var(--green); background:rgba(0,229,160,.1); border-color:rgba(0,229,160,.25); }
+
+  .bar-track{ background:var(--border); border-radius:3px; height:5px; overflow:hidden; }
+  .bar-fill{ height:5px; border-radius:3px; background:var(--accent); }
+
+  .alert{ padding:12px 14px; border-radius:8px; margin-bottom:10px; font-size:13px;
+    display:flex; gap:10px; align-items:flex-start; line-height:1.5; }
+  .alert-i{ background:rgba(224,64,251,.07); border:1px solid rgba(224,64,251,.25); color:#e9a3fc; }
+
+  /* Treino */
+  .wtabs{ display:flex; gap:6px; overflow-x:auto; margin-bottom:16px; padding-bottom:2px; }
+  .wtab{ flex-shrink:0; padding:9px 16px; border-radius:8px; font-size:13px; font-weight:700;
+    background:var(--surface); border:1px solid var(--border); color:var(--muted); cursor:pointer;
+    font-family:inherit; }
+  .wtab.active{ background:var(--accent); border-color:var(--accent); color:#1a0a1f; }
+
+  .wheader{ border-radius:12px 12px 0 0; padding:16px 18px; background:var(--accent); }
+  .wheader .wname{ font-size:17px; font-weight:700; color:#1a0a1f; }
+  .wheader .wfocus{ font-size:12px; color:rgba(26,10,31,.75); margin-top:2px; font-weight:600; }
+
+  .exlist{ background:var(--surface); border:1px solid var(--border); border-top:none;
+    border-radius:0 0 12px 12px; overflow:hidden; }
+  .exrow{ display:flex; align-items:center; gap:12px; padding:13px 16px; border-bottom:1px solid var(--border); }
+  .exlist .exrow:last-child{ border-bottom:none; }
+  .exrow .exnum{ font-size:11px; color:var(--muted); width:16px; flex-shrink:0; font-weight:700; }
+  .exrow .exinfo{ flex:1; min-width:0; }
+  .exrow .exname{ font-size:13.5px; font-weight:600; margin-bottom:2px; }
+  .exrow .exname.done{ color:var(--dim); text-decoration:line-through; }
+  .exrow .extarget{ font-size:11.5px; color:var(--dim); }
+  .exrow input[type=checkbox]{ width:20px; height:20px; flex-shrink:0; accent-color:var(--accent); }
+
+  .cardio-block{ background:var(--surface); border:1px solid var(--border); border-top:none;
+    border-radius:0 0 12px 12px; padding:16px 18px; }
+  .cardio-block .cline{ display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border); font-size:13.5px; }
+  .cardio-block .cline:last-child{ border-bottom:none; }
+  .cardio-block .cline .lbl{ color:var(--dim); }
+
+  .note-box{ background:var(--surface2); border-radius:8px; padding:12px 14px; margin-top:12px;
+    font-size:12.5px; color:var(--dim); line-height:1.5; }
+
+  .save-cta{ width:100%; background:var(--accent); color:#1a0a1f; border:none; padding:14px;
+    border-radius:8px; font-size:14.5px; font-weight:700; cursor:pointer; margin-top:14px;
+    font-family:inherit; }
+
+  .complete-banner{
+    background:linear-gradient(135deg, rgba(224,64,251,.18), rgba(224,64,251,.06));
+    border:1px solid rgba(224,64,251,.35); border-radius:12px; padding:22px;
+    margin-bottom:14px; text-align:center;
+  }
+  .complete-banner .icon{ font-size:32px; margin-bottom:6px; }
+  .complete-banner .title{ font-size:18px; font-weight:700; color:var(--accent); margin-bottom:4px; }
+  .complete-banner .sub2{ font-size:13px; color:var(--dim); }
+
+  /* Dieta */
+  .macro-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:16px; }
+  .macro-cell{ background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:12px 6px; text-align:center; }
+  .macro-cell .v{ font-size:16px; font-weight:700; color:var(--accent); }
+  .macro-cell .l{ font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-top:2px; }
+
+  .checklist-item{ display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--border);
+    font-size:13.5px; }
+  .checklist-item:last-child{ border-bottom:none; }
+  .checklist-item input{ width:19px; height:19px; accent-color:var(--accent); flex-shrink:0; }
+  .checklist-item.done label{ color:var(--dim); text-decoration:line-through; }
+
+  /* Check-in */
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:11.5px; color:var(--muted); text-transform:uppercase;
+    letter-spacing:.05em; margin-bottom:6px; }
+  .field input, .field select{ width:100%; background:var(--surface2); border:1px solid var(--border);
+    border-radius:8px; padding:12px; color:var(--text); font-size:14px; font-family:inherit; }
+  .frow{ display:flex; gap:10px; }
+  .frow .field{ flex:1; }
+  .history-entry{ display:flex; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--border);
+    font-size:12.5px; }
+  .history-entry:last-child{ border-bottom:none; }
+  .history-entry .d{ color:var(--dim); }
+  .empty{ text-align:center; padding:30px 20px; color:var(--muted); font-size:13px; }
+
+  /* Bottom nav */
+  nav.bottom{
+    position:fixed; bottom:0; left:0; right:0; max-width:700px; margin:0 auto;
+    background:rgba(13,10,20,.97); border-top:1px solid var(--border); z-index:100;
+    display:flex; height:64px;
+  }
+  nav.bottom button{
+    flex:1; background:none; border:none; color:var(--muted); font-size:10.5px; font-weight:600;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    font-family:inherit;
+  }
+  nav.bottom button.active{ color:var(--accent); }
+  nav.bottom button .icon{ font-size:19px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <main class="pg">
+
+    <!-- DASHBOARD -->
+    <section class="view active" id="view-dashboard">
+      <div class="eyebrow">Visão geral</div>
+      <h1 class="h1">JUL // PERF</h1>
+      <p class="sub">Olá, Juliana. Progresso da semana.</p>
+
+      <div class="stat-row">
+        <div class="stat">
+          <div class="label">Peso atual</div>
+          <div class="value" id="statWeight">56,4 kg</div>
+          <div class="delta down" id="statWeightDelta">Meta: 55 kg · faltam 1,4 kg</div>
+        </div>
+        <div class="stat">
+          <div class="label">Joelho</div>
+          <div class="value" id="statKnee" style="font-size:15px;">Sem dor</div>
+          <div class="delta flat">Liberada p/ carga</div>
+        </div>
+      </div>
+
+      <div class="alert alert-i">
+        <span>i</span>
+        <span>Protocolo considera lipedema: a gordura das pernas responde mais devagar que a do resto do corpo — resultado visível aparece primeiro em cintura e abdômen.</span>
+      </div>
+
+      <div class="ct">Cronograma da semana</div>
+      <div class="card">
+        <div class="schedule-row"><span class="day">Treino 1</span><span class="what">Superior completo</span><span class="badge">Força</span></div>
+        <div class="schedule-row"><span class="day">Treino 2</span><span class="what">Lower A — Glúteo/Posterior</span><span class="badge">Perna</span></div>
+        <div class="schedule-row"><span class="day">Treino 3</span><span class="what">Lower B — Quadríceps moderado</span><span class="badge">Perna</span></div>
+        <div class="schedule-row"><span class="day">Treino 4</span><span class="what">Cardio + Core</span><span class="badge cardio">Cardio</span></div>
+      </div>
+      <div class="note-box">Semanas de 3 dias: alterna qual Lower entra junto com Superior e Cardio+Core. Semanas de 4 dias: fecha os quatro.</div>
+
+      <div class="ct">Frequência — últimos 14 dias</div>
+      <div class="card" id="frequencyCard">
+        <div class="empty">Registre treinos na aba Treino para ver a frequência aqui.</div>
+      </div>
+
+      <div class="ct">Último check-in</div>
+      <div class="card" id="lastCheckinCard">
+        <div class="empty">Nenhum check-in registrado ainda.</div>
+      </div>
+    </section>
+
+    <!-- TREINO -->
+    <section class="view" id="view-treino">
+      <div class="eyebrow">Treino</div>
+      <h1 class="h1">Sessão de hoje</h1>
+      <p class="sub">Amplitude e carga em perna: conforme orientação do profissional que acompanha o joelho e a resposta articular na execução.</p>
+
+      <div class="wtabs" id="workoutTabs"></div>
+      <div id="completeBannerSlot"></div>
+      <div id="workoutHeaderSlot"></div>
+      <div id="exerciseListSlot"></div>
+      <div id="noteSlot"></div>
+      <button class="save-cta" id="saveWorkoutBtn">Salvar treino no histórico</button>
+    </section>
+
+    <!-- DIETA -->
+    <section class="view" id="view-dieta">
+      <div class="eyebrow">Nutrição</div>
+      <h1 class="h1">Dieta</h1>
+      <p class="sub">Protocolo anti-inflamatório — relevante para manejo do lipedema.</p>
+
+      <div class="macro-grid">
+        <div class="macro-cell"><div class="v">1.800</div><div class="l">kcal</div></div>
+        <div class="macro-cell"><div class="v">120g</div><div class="l">proteína</div></div>
+        <div class="macro-cell"><div class="v">160g</div><div class="l">carbo</div></div>
+        <div class="macro-cell"><div class="v">55g</div><div class="l">gordura</div></div>
+      </div>
+
+      <div class="ct">Diretrizes anti-inflamatórias</div>
+      <div class="card">
+        <div class="schedule-row"><span class="what">Sódio reduzido — controle de retenção</span></div>
+        <div class="schedule-row"><span class="what">Ômega-3 diário</span></div>
+        <div class="schedule-row"><span class="what">Flavonoides — frutas vermelhas, chá verde, cacau</span></div>
+        <div class="schedule-row"><span class="what">Testar redução de glúten/laticínios por 4 semanas</span></div>
+        <div class="schedule-row"><span class="what">Hidratação: 2,5–3L/dia</span></div>
+      </div>
+
+      <div class="ct">Checklist do dia</div>
+      <div class="card">
+        <div class="checklist-item"><input type="checkbox" id="cl1"><label for="cl1">Bateu meta de proteína</label></div>
+        <div class="checklist-item"><input type="checkbox" id="cl2"><label for="cl2">Dentro da meta calórica</label></div>
+        <div class="checklist-item"><input type="checkbox" id="cl3"><label for="cl3">Sódio controlado</label></div>
+        <div class="checklist-item"><input type="checkbox" id="cl4"><label for="cl4">Hidratação adequada</label></div>
+        <div class="checklist-item"><input type="checkbox" id="cl5"><label for="cl5">Creatina + Ômega-3 + Vit. D3/K2</label></div>
+      </div>
+      <button class="save-cta" id="saveDietaBtn">Salvar dia</button>
+    </section>
+
+    <!-- CHECK-IN -->
+    <section class="view" id="view-checkin">
+      <div class="eyebrow">Acompanhamento</div>
+      <h1 class="h1">Check-in semanal</h1>
+      <p class="sub">Em jejum, mesmo horário da semana.</p>
+
+      <div class="card">
+        <div class="frow">
+          <div class="field"><label>Peso (kg)</label><input type="number" step="0.1" id="ciWeight" placeholder="57.5"></div>
+          <div class="field"><label>Cintura (cm)</label><input type="number" step="0.1" id="ciWaist" placeholder="70"></div>
+        </div>
+        <div class="field"><label>% Gordura (bioimpedância, se tiver)</label><input type="number" step="0.1" id="ciBF" placeholder="ex: 28.0"></div>
+        <div class="field"><label>Dor no joelho</label>
+          <select id="ciKnee">
+            <option value="Sem dor" selected>Sem dor</option>
+            <option value="Leve">Leve</option>
+            <option value="Moderada">Moderada — avisar profissional</option>
+          </select>
+        </div>
+        <div class="frow">
+          <div class="field"><label>Treinos feitos na semana</label><input type="number" step="1" id="ciSessions" placeholder="4"></div>
+          <div class="field"><label>Creatina em dia?</label>
+            <select id="ciCreatina">
+              <option value="Sim">Sim</option>
+              <option value="Não">Não</option>
+            </select>
+          </div>
+        </div>
+        <button class="save-cta" id="saveCheckinBtn">Registrar check-in</button>
+      </div>
+
+      <div class="ct">Histórico</div>
+      <div class="card" id="checkinHistory">
+        <div class="empty">Nenhum registro ainda — o primeiro check-in aparece aqui.</div>
+      </div>
+    </section>
+
+  </main>
+
+  <nav class="bottom">
+    <button data-view="dashboard" class="active"><span class="icon">◈</span>Dashboard</button>
+    <button data-view="treino"><span class="icon">✚</span>Treino</button>
+    <button data-view="dieta"><span class="icon">◐</span>Dieta</button>
+    <button data-view="checkin"><span class="icon">✓</span>Check-in</button>
+  </nav>
+</div>
+
+<script>
+/* ---------------- DATA ---------------- */
+const WORKOUTS = {
+  T1: {
+    title: "Superior Completo", focus: "Peito/Costas/Ombro/Braços",
+    exercises: [
+      {n:"Supino reto máquina ou halteres", sr:"3×8–10", target:"Peitoral"},
+      {n:"Puxada frontal", sr:"3×10–12", target:"Costas"},
+      {n:"Desenvolvimento halteres sentado", sr:"3×8–10", target:"Deltoide"},
+      {n:"Remada máquina ou cabo", sr:"3×10–12", target:"Costas"},
+      {n:"Elevação lateral", sr:"3×12–15", target:"Deltoide lateral"},
+      {n:"Rosca direta", sr:"2×12–15", target:"Bíceps"},
+      {n:"Tríceps corda", sr:"2×12–15", target:"Tríceps"},
+      {n:"Crossover ou crucifixo máquina", sr:"2×12–15", target:"Peitoral"},
+    ],
+    note: "Descanso: compostos 90s-2min, isoladores 45-60s."
+  },
+  T2: {
+    title: "Lower A — Posterior/Glúteo", focus: "Baixo estresse patelar",
+    exercises: [
+      {n:"Hip thrust", sr:"4×10–12", target:"Glúteo"},
+      {n:"Stiff/RDL halteres", sr:"3×10–12", target:"Posterior de coxa"},
+      {n:"Cadeira abdutora", sr:"3×15–20", target:"Glúteo médio"},
+      {n:"Mesa flexora", sr:"3×12–15", target:"Posterior de coxa"},
+      {n:"Elevação pélvica unilateral", sr:"2×12 cada lado", target:"Glúteo"},
+      {n:"Cadeira adutora", sr:"3×15–20", target:"Adutores"},
+    ],
+    note: "Meia de compressão recomendada neste treino."
+  },
+  T3: {
+    title: "Lower B — Quadríceps moderado", focus: "Quadríceps + Panturrilha",
+    exercises: [
+      {n:"Leg press (amplitude controlada, não profunda)", sr:"4×10–12", target:"Quadríceps"},
+      {n:"Cadeira extensora (amplitude parcial, sem travar o joelho)", sr:"3×15 (leve/moderado)", target:"Quadríceps"},
+      {n:"Passada ou afundo curto", sr:"3×10 cada lado", target:"Quadríceps/Glúteo"},
+      {n:"Cadeira extensora unilateral (carga leve)", sr:"3×12 cada lado", target:"Quadríceps"},
+      {n:"Panturrilha em pé", sr:"3×15–20", target:"Panturrilha"},
+      {n:"Panturrilha sentado", sr:"3×15–20", target:"Panturrilha"},
+    ],
+    note: ""
+  },
+  T4: {
+    title: "Aeróbico + Abdômen", focus: "Bike zona 2 — drenagem linfática",
+    isCardio: true,
+    cardio: { name: "Bike ergométrica", detail: "25–30 min, ritmo moderado constante, zona 2" },
+    exercises: [
+      {n:"Prancha", sr:"3×30–45s", target:"Core"},
+      {n:"Prancha lateral", sr:"2×20–30s cada lado", target:"Oblíquos"},
+      {n:"Elevação de pernas", sr:"3×12–15", target:"Core inferior"},
+      {n:"Abdominal na polia", sr:"3×12–15", target:"Core"},
+      {n:"Rotação de tronco na polia (russian twist cabo)", sr:"3×12 cada lado", target:"Oblíquos"},
+      {n:"Bicicleta abdominal (oblíquo)", sr:"3×15 cada lado", target:"Oblíquos"},
+    ],
+    note: "Movimento cíclico de baixo impacto — ajuda a bombear o sistema linfático das pernas sem carregar o joelho."
+  },
+};
+const ORDER = ["T1","T2","T3","T4"];
+const LABELS = {T1:"1", T2:"2", T3:"3", T4:"4"};
+let currentWorkout = "T1";
+
+/* ---------------- STORAGE ---------------- */
+const store = {
+  get(k,f){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):f; }catch(e){ return f; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+/* ---------------- NAV ---------------- */
+document.querySelectorAll('nav.bottom button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav.bottom button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+btn.dataset.view).classList.add('active');
+  });
+});
+
+/* ---------------- TREINO ---------------- */
+function renderWorkoutTabs(){
+  const wrap = document.getElementById('workoutTabs');
+  wrap.innerHTML = '';
+  ORDER.forEach(code=>{
+    const b = document.createElement('button');
+    b.className = 'wtab' + (code===currentWorkout ? ' active' : '');
+    b.textContent = 'Treino ' + LABELS[code];
+    b.addEventListener('click', ()=>{ currentWorkout = code; renderTreino(); });
+    wrap.appendChild(b);
+  });
+}
+function getChecksForToday(code){ return store.get('jul_checks_'+code+'_'+todayISO(), {}); }
+
+function renderTreino(){
+  renderWorkoutTabs();
+  const w = WORKOUTS[currentWorkout];
+  const checks = getChecksForToday(currentWorkout);
+  const doneCount = w.exercises.filter((_,i)=>checks[i]).length;
+  const total = w.exercises.length;
+  const pct = Math.round((doneCount/total)*100);
+
+  const bannerSlot = document.getElementById('completeBannerSlot');
+  bannerSlot.innerHTML = pct===100 ? `
+    <div class="complete-banner">
+      <div class="icon">🌸</div>
+      <div class="title">Treino Concluído!</div>
+      <div class="sub2">${w.title} · ${total}/${total} exercícios executados</div>
+    </div>` : '';
+
+  document.getElementById('workoutHeaderSlot').innerHTML = `
+    <div class="wheader">
+      <div class="wname">Treino ${LABELS[currentWorkout]} — ${w.title}</div>
+      <div class="wfocus">${w.focus}</div>
+    </div>
+    <div style="background:var(--surface); border:1px solid var(--border); border-top:none; padding:10px 18px; display:flex; align-items:center; gap:10px;">
+      <div class="bar-track" style="flex:1;"><div class="bar-fill" style="width:${pct}%;"></div></div>
+      <span style="font-size:11.5px; color:var(--dim); flex-shrink:0;">${doneCount}/${total}</span>
+    </div>
+  `;
+
+  const list = document.getElementById('exerciseListSlot');
+  let html = '';
+  if (w.isCardio){
+    html += `<div class="cardio-block">
+      <div class="cline"><span class="lbl">Atividade</span><span>${w.cardio.name}</span></div>
+      <div class="cline"><span class="lbl">Protocolo</span><span>${w.cardio.detail}</span></div>
+    </div>`;
+  }
+  html += `<div class="exlist">` + w.exercises.map((ex,i)=>{
+    const isDone = !!checks[i];
+    return `
+      <div class="exrow">
+        <span class="exnum">${i+1}</span>
+        <input type="checkbox" class="ex-check" data-idx="${i}" ${isDone?'checked':''}>
+        <div class="exinfo">
+          <div class="exname ${isDone?'done':''}">${ex.n}</div>
+          <div class="extarget">${ex.sr} · ${ex.target}</div>
+        </div>
+      </div>
+    `;
+  }).join('') + `</div>`;
+  list.innerHTML = html;
+
+  document.getElementById('noteSlot').innerHTML = w.note ? `<div class="note-box">${w.note}</div>` : '';
+
+  list.querySelectorAll('.ex-check').forEach(chk=>{
+    chk.addEventListener('change', ()=>{
+      const idx = chk.dataset.idx;
+      const c = getChecksForToday(currentWorkout);
+      c[idx] = chk.checked;
+      store.set('jul_checks_'+currentWorkout+'_'+todayISO(), c);
+      renderTreino();
+    });
+  });
+
+  const saveBtn = document.getElementById('saveWorkoutBtn');
+  saveBtn.textContent = pct===100 ? '✓ Salvar treino no histórico' : `Salvar treino no histórico (${doneCount}/${total})`;
+}
+
+document.getElementById('saveWorkoutBtn').addEventListener('click', ()=>{
+  const checks = getChecksForToday(currentWorkout);
+  const sessions = store.get('jul_sessions', []);
+  sessions.push({ code: currentWorkout, date: todayISO(), checks });
+  store.set('jul_sessions', sessions);
+  const btn = document.getElementById('saveWorkoutBtn');
+  btn.textContent = '✓ Sessão salva no histórico';
+  setTimeout(()=>{ renderTreino(); renderDashboard(); }, 1200);
+});
+
+/* ---------------- DIETA ---------------- */
+document.getElementById('saveDietaBtn').addEventListener('click', ()=>{
+  const checks = {
+    proteina: document.getElementById('cl1').checked,
+    caloria: document.getElementById('cl2').checked,
+    sodio: document.getElementById('cl3').checked,
+    hidratacao: document.getElementById('cl4').checked,
+    suplementos: document.getElementById('cl5').checked,
+  };
+  const log = store.get('jul_dieta_log', {});
+  log[todayISO()] = checks;
+  store.set('jul_dieta_log', log);
+  const btn = document.getElementById('saveDietaBtn');
+  const orig = btn.textContent;
+  btn.textContent = '✓ Dia salvo';
+  setTimeout(()=>{ btn.textContent = orig; }, 1500);
+});
+
+/* ---------------- CHECK-IN ---------------- */
+function formatDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit'});
+}
+function renderCheckinHistory(){
+  const entries = store.get('jul_checkins', []);
+  const wrap = document.getElementById('checkinHistory');
+  if (entries.length === 0){
+    wrap.innerHTML = '<div class="empty">Nenhum registro ainda — o primeiro check-in aparece aqui.</div>';
+    return;
+  }
+  const sorted = [...entries].sort((a,b)=> new Date(b.date)-new Date(a.date)).slice(0,10);
+  wrap.innerHTML = sorted.map(e=>`
+    <div class="history-entry">
+      <span class="d">${formatDate(e.date)}</span>
+      <span>${e.weight}kg · ${e.waist}cm · joelho: ${e.knee}</span>
+    </div>
+  `).join('');
+}
+document.getElementById('saveCheckinBtn').addEventListener('click', ()=>{
+  const weight = document.getElementById('ciWeight').value;
+  const waist = document.getElementById('ciWaist').value;
+  const bf = document.getElementById('ciBF').value;
+  const knee = document.getElementById('ciKnee').value;
+  const sessions = document.getElementById('ciSessions').value;
+  const creatina = document.getElementById('ciCreatina').value;
+  if (!weight){ alert('Informe ao menos o peso.'); return; }
+  const entries = store.get('jul_checkins', []);
+  entries.push({ date: todayISO(), weight, waist, bf, knee, sessions, creatina });
+  store.set('jul_checkins', entries);
+  ['ciWeight','ciWaist','ciBF','ciSessions'].forEach(id=> document.getElementById(id).value='');
+  renderCheckinHistory(); renderDashboard();
+  const btn = document.getElementById('saveCheckinBtn');
+  const orig = btn.textContent;
+  btn.textContent = '✓ Registrado';
+  setTimeout(()=>{ btn.textContent = orig; }, 1500);
+});
+
+/* ---------------- DASHBOARD ---------------- */
+function renderDashboard(){
+  const entries = store.get('jul_checkins', []);
+  const weightEl = document.getElementById('statWeight');
+  const deltaEl = document.getElementById('statWeightDelta');
+  const kneeEl = document.getElementById('statKnee');
+  if (entries.length > 0){
+    const sorted = [...entries].sort((a,b)=> new Date(b.date)-new Date(a.date));
+    const latest = parseFloat(sorted[0].weight);
+    weightEl.textContent = latest.toFixed(1).replace('.', ',') + ' kg';
+    const remaining = Math.max(0, (latest - 55)).toFixed(1).replace('.', ',');
+    deltaEl.textContent = 'Meta: 55 kg · faltam ' + remaining + ' kg';
+    kneeEl.textContent = sorted[0].knee || 'Sem dor';
+  }
+
+  const sessions = store.get('jul_sessions', []);
+  const cutoff = Date.now() - 14*86400000;
+  const recent = sessions.filter(s=> new Date(s.date).getTime() >= cutoff);
+  const freqEl = document.getElementById('frequencyCard');
+  if (recent.length === 0){
+    freqEl.innerHTML = '<div class="empty">Registre treinos na aba Treino para ver a frequência aqui.</div>';
+  } else {
+    const byCode = {};
+    recent.forEach(s=>{ byCode[s.code] = (byCode[s.code]||0)+1; });
+    freqEl.innerHTML = ORDER.map(code=>{
+      const count = byCode[code] || 0;
+      const pct = Math.min(100, count*33);
+      return `
+        <div class="schedule-row">
+          <span class="day">Treino ${LABELS[code]}</span>
+          <span class="what" style="flex:1; padding-right:10px;">
+            <div class="bar-track"><div class="bar-fill" style="width:${pct}%;"></div></div>
+          </span>
+          <span style="color:var(--dim); font-size:12px; flex-shrink:0;">${count}x</span>
+        </div>`;
+    }).join('');
+  }
+
+  const lastCheckin = document.getElementById('lastCheckinCard');
+  if (entries.length === 0){
+    lastCheckin.innerHTML = '<div class="empty">Nenhum check-in registrado ainda.</div>';
+  } else {
+    const latest = [...entries].sort((a,b)=> new Date(b.date)-new Date(a.date))[0];
+    lastCheckin.innerHTML = `
+      <div class="schedule-row"><span class="day">Data</span><span class="what">${formatDate(latest.date)}</span></div>
+      <div class="schedule-row"><span class="day">Peso</span><span class="what">${latest.weight} kg</span></div>
+      <div class="schedule-row"><span class="day">Cintura</span><span class="what">${latest.waist || '—'} cm</span></div>
+      <div class="schedule-row"><span class="day">Joelho</span><span class="what">${latest.knee || '—'}</span></div>
+    `;
+  }
+}
+
+/* ---------------- INIT ---------------- */
+renderTreino();
+renderCheckinHistory();
+renderDashboard();
+</script>
+</body>
+</html>
